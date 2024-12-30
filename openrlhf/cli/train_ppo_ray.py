@@ -61,6 +61,9 @@ def train(args):
         ]
         pg_actor_ref = placement_group(bundles, strategy="STRICT_SPREAD")
         ray.get(pg_actor_ref.ready())
+    if args.colocate_actor_vllm:
+        assert args.colocate_actor_ref, 'When using colocate_actor_vllm, must also use colocate_actor_ref'
+        assert args.actor_num_nodes == args.vllm_num_engines, f"num_engines be the same when colocate actor and vllm model."
 
     # NOTE(wuxibin): Why don't we allocate 0.5 gpu for each actor when colocate models?
     # Say we have 1 node with 4 GPUs, and num_gpus_per_node for each model is 4.
