@@ -80,6 +80,7 @@ class LLMRayActor:
                 "context_length": kwargs.get("max_model_len", None),
                 "log_level": "info",
                 "return_token_ids": True,
+                "mem_fraction_static": kwargs.get("mem_fraction_static", None),
             }
             self.llm = sglang.Engine(**sglang_params)
 
@@ -175,6 +176,7 @@ def create_inference_engines(
         seed: int,
         enable_prefix_caching: bool,
         enforce_eager: bool,
+        mem_fraction_static: Optional[float],
         max_model_len: int,
         num_gpus_per_actor: float,
         pg: Optional[PlacementGroup],
@@ -221,6 +223,7 @@ def create_inference_engines(
                 enable_prefix_caching=enable_prefix_caching,
                 enforce_eager=enforce_eager,
                 max_model_len=max_model_len,
+                mem_fraction_static=mem_fraction_static,
                 backend=backend,
             )
         )

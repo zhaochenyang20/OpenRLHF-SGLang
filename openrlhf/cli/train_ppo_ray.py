@@ -165,6 +165,7 @@ def train(args):
             args.seed,
             args.enable_prefix_caching,
             args.enforce_eager,
+            args.mem_fraction_static,
             max_len,
             backend=args.backend,
             num_gpus_per_actor=num_gpus_per_actor_vllm,
@@ -239,6 +240,7 @@ if __name__ == "__main__":
     parser.add_argument("--vllm_sync_backend", type=str, default="nccl", help="DeepSpeed -> vLLM weight sync backend")
     parser.add_argument("--enable_prefix_caching", action="store_true", default=False)
     parser.add_argument("--enforce_eager", action="store_true", default=False, help="Disable CUDA graph in vLLM")
+    parser.add_argument("--mem_fraction_static", type=float, default=None, help="Memory usage fraction in SGLang")
     parser.add_argument(
         "--colocate_actor_vllm",
         action="store_true",
