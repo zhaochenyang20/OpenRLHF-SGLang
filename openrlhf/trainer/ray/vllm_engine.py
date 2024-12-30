@@ -3,10 +3,11 @@ import time
 
 import ray
 import torch
-from openrlhf.trainer.ray.utils import ray_noset_visible_devices
-from openrlhf.utils.logging_utils import init_logger
 from ray.util.placement_group import placement_group
 from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
+
+from openrlhf.trainer.ray.utils import ray_noset_visible_devices
+from openrlhf.utils.logging_utils import init_logger
 
 logger = init_logger(__name__)
 
@@ -104,7 +105,7 @@ class LLMRayActor:
 
             # min_tokens, include_stop_str_in_output is not used in sglang
 
-            logging.warning(f'hi LLMRayActor.generate {type(all_prompts)=}')
+            logging.warning(f"hi LLMRayActor.generate {type(all_prompts)=}")
             sampling_params = dict(
                 max_new_tokens=sampling_params.max_tokens,
                 top_p=sampling_params.top_p,
@@ -136,7 +137,7 @@ class LLMRayActor:
             )
 
     def update_weight(self, name, dtype, shape, empty_cache=False):
-        logging.warning(f'hi LLMRayActor.update_weight {name=} {dtype=} {shape=}')
+        logging.warning(f"hi LLMRayActor.update_weight {name=} {dtype=} {shape=}")
         if self.backend == "vllm":
             self.stop_remote_worker_execution_loop()
 
@@ -158,14 +159,14 @@ class LLMRayActor:
 
 
 def create_inference_engines(
-        num_engines: int,
-        tensor_parallel_size: int,
-        pretrain: str,
-        seed: int,
-        enable_prefix_caching: bool,
-        enforce_eager: bool,
-        max_model_len: int,
-        backend: str = "vllm",
+    num_engines: int,
+    tensor_parallel_size: int,
+    pretrain: str,
+    seed: int,
+    enable_prefix_caching: bool,
+    enforce_eager: bool,
+    max_model_len: int,
+    backend: str = "vllm",
 ):
     print(f"backend: {backend}")
     inference_engines = []

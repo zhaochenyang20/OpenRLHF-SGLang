@@ -6,12 +6,13 @@ from typing import Any, Callable, Dict, List, Optional
 
 import torch
 import torch.nn as nn
-from openrlhf.models import Actor, GPTLMLoss, PolicyLoss, ValueLoss
-from openrlhf.models.utils import masked_mean
-from openrlhf.utils.distributed_sampler import DistributedSampler
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
+from openrlhf.models import Actor, GPTLMLoss, PolicyLoss, ValueLoss
+from openrlhf.models.utils import masked_mean
+from openrlhf.utils.distributed_sampler import DistributedSampler
 
 from .ppo_utils import AdaptiveKLController, Experience, FixedKLController, NaiveExperienceMaker, NaiveReplayBuffer
 
@@ -54,40 +55,40 @@ class PPOTrainer(ABC):
     """
 
     def __init__(
-            self,
-            strategy,
-            actor: Actor,
-            critic: nn.Module,
-            reward_model: nn.Module,
-            initial_model: Actor,
-            ema_model: Actor,
-            actor_optim: Optimizer,
-            critic_optim: Optimizer,
-            actor_scheduler,
-            critic_scheduler,
-            ema_beta: float = 0.992,
-            init_kl_coef: float = 0.001,
-            kl_target: float = None,
-            kl_horizon: int = 10000,
-            ptx_coef: float = 0,
-            micro_train_batch_size: int = 8,
-            buffer_limit: int = 0,
-            buffer_cpu_offload: bool = True,
-            eps_clip: float = 0.2,
-            value_clip: float = 0.2,
-            micro_rollout_batch_size: int = 8,
-            gradient_checkpointing: bool = False,
-            max_epochs: int = 1,
-            max_norm: float = 1.0,
-            tokenizer: Optional[Callable[[Any], dict]] = None,
-            prompt_max_len: int = 128,
-            dataloader_pin_memory: bool = True,
-            remote_rm_url: str = None,
-            reward_fn: Callable[[List[torch.Tensor]], torch.Tensor] = None,
-            **generate_kwargs,
+        self,
+        strategy,
+        actor: Actor,
+        critic: nn.Module,
+        reward_model: nn.Module,
+        initial_model: Actor,
+        ema_model: Actor,
+        actor_optim: Optimizer,
+        critic_optim: Optimizer,
+        actor_scheduler,
+        critic_scheduler,
+        ema_beta: float = 0.992,
+        init_kl_coef: float = 0.001,
+        kl_target: float = None,
+        kl_horizon: int = 10000,
+        ptx_coef: float = 0,
+        micro_train_batch_size: int = 8,
+        buffer_limit: int = 0,
+        buffer_cpu_offload: bool = True,
+        eps_clip: float = 0.2,
+        value_clip: float = 0.2,
+        micro_rollout_batch_size: int = 8,
+        gradient_checkpointing: bool = False,
+        max_epochs: int = 1,
+        max_norm: float = 1.0,
+        tokenizer: Optional[Callable[[Any], dict]] = None,
+        prompt_max_len: int = 128,
+        dataloader_pin_memory: bool = True,
+        remote_rm_url: str = None,
+        reward_fn: Callable[[List[torch.Tensor]], torch.Tensor] = None,
+        **generate_kwargs,
     ) -> None:
         assert (
-                not isinstance(reward_model, List) or len(reward_model) == 1 or reward_fn is not None
+            not isinstance(reward_model, List) or len(reward_model) == 1 or reward_fn is not None
         ), "reward_fn must be specified if using multiple reward models"
 
         super().__init__()
@@ -181,20 +182,20 @@ class PPOTrainer(ABC):
             self._tensorboard = SummaryWriter(log_dir=log_dir)
 
     def fit(
-            self,
-            args,
-            prompts_dataloader,
-            pretrain_dataloader,
-            consumed_samples=0,
-            num_update_steps_per_episodes=1,
+        self,
+        args,
+        prompts_dataloader,
+        pretrain_dataloader,
+        consumed_samples=0,
+        num_update_steps_per_episodes=1,
     ) -> None:
-        logging.warning('hi PPOTrainer.fit start')
+        logging.warning("hi PPOTrainer.fit start")
         num_rollouts_per_episodes = (
-                num_update_steps_per_episodes
-                * args.train_batch_size
-                // args.max_epochs
-                // args.rollout_batch_size
-                // args.n_samples_per_prompt
+            num_update_steps_per_episodes
+            * args.train_batch_size
+            // args.max_epochs
+            // args.rollout_batch_size
+            // args.n_samples_per_prompt
         )
 
         # get eval and save steps
@@ -212,7 +213,7 @@ class PPOTrainer(ABC):
         consumed_samples = consumed_samples % (num_rollouts_per_episodes * args.rollout_batch_size)
 
         for episode in range(start_episode, args.num_episodes):
-            logging.warning(f'hi PPOTrainer.fit loop (iterate episode) {episode=}')
+            logging.warning(f"hi PPOTrainer.fit loop (iterate episode) {episode=}")
             if isinstance(self.prompts_dataloader.sampler, DistributedSampler):
                 self.prompts_dataloader.sampler.set_epoch(
                     episode, consumed_samples=0 if episode > start_episode else consumed_samples
@@ -224,11 +225,11 @@ class PPOTrainer(ABC):
             )
 
             for rand_prompts in self.prompts_dataloader:
-                logging.warning(f'hi PPOTrainer.fit loop (iterate prompts) {len(rand_prompts)=}')
+                logging.warning(f"hi PPOTrainer.fit loop (iterate prompts) {len(rand_prompts)=}")
                 for i, experience in enumerate(
-                        self.experience_maker.make_experience_list(rand_prompts, **self.generate_kwargs)
+                    self.experience_maker.make_experience_list(rand_prompts, **self.generate_kwargs)
                 ):
-                    logging.warning(f'hi PPOTrainer.fit loop (iterate experience) {i=}')
+                    logging.warning(f"hi PPOTrainer.fit loop (iterate experience) {i=}")
                     if i == 0:
                         output = self.tokenizer.batch_decode(
                             experience.sequences[0].unsqueeze(0), skip_special_tokens=True
@@ -259,7 +260,7 @@ class PPOTrainer(ABC):
             self._tensorboard.close()
 
     def ppo_train(self, global_steps=0):
-        logging.warning(f'hi PPOTrainer.ppo_train start {global_steps=}')
+        logging.warning(f"hi PPOTrainer.ppo_train start {global_steps=}")
         # replay buffer may be empty at first, we should rebuild at each training
         dataloader = DataLoader(
             self.replay_buffer,
@@ -274,14 +275,14 @@ class PPOTrainer(ABC):
         status_list = []
         status_mean = {}
         for epoch in range(self.max_epochs):
-            logging.warning(f'hi PPOTrainer.ppo_train loop (iterate epoch) {epoch=}')
+            logging.warning(f"hi PPOTrainer.ppo_train loop (iterate epoch) {epoch=}")
             pbar = tqdm(
                 dataloader,
                 desc=f"Train epoch [{epoch + 1}/{self.max_epochs}]",
                 disable=not self.strategy.is_rank_0(),
             )
             for experience in pbar:
-                logging.warning(f'hi PPOTrainer.ppo_train loop (iterate experience)')
+                logging.warning(f"hi PPOTrainer.ppo_train loop (iterate experience)")
                 experience.to_device(device)
                 status = self.training_step(experience, global_steps)
 
@@ -334,7 +335,7 @@ class PPOTrainer(ABC):
         return status
 
     def training_step_actor(self, experience: Experience) -> Dict[str, float]:
-        logging.warning(f'hi PPOTrainer.training_step_actor start')
+        logging.warning(f"hi PPOTrainer.training_step_actor start")
         self.actor.train()
 
         # TODO: this is a bad indicator to say that data is packed...
@@ -414,14 +415,14 @@ class PPOTrainer(ABC):
         for k, v in experience.info.items():
             if k == "kl":
                 status[k] = (
-                        (v * experience.info["response_length"]).sum() / experience.info["response_length"].sum()
+                    (v * experience.info["response_length"]).sum() / experience.info["response_length"].sum()
                 ).item()
             else:
                 status[k] = v.mean().item()
         return status
 
     def training_step_critic(self, experience: Experience) -> Dict[str, float]:
-        logging.warning(f'hi PPOTrainer.training_step_critic start')
+        logging.warning(f"hi PPOTrainer.training_step_critic start")
         self.critic.train()
 
         # TODO: this is a bad indicator to say that data is packed...
