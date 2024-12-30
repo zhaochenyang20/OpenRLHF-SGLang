@@ -176,7 +176,7 @@ def create_inference_engines(
         enable_prefix_caching: bool,
         enforce_eager: bool,
         max_model_len: int,
-        num_gpus_per_actor: int,
+        num_gpus_per_actor: float,
         pg: Optional[PlacementGroup],
         backend: str = "vllm",
 ):
@@ -199,8 +199,8 @@ def create_inference_engines(
             # When tensor_parallel_size=1 and RAY_EXPERIMENTAL_NOSET_*_VISIBLE_DEVICES is not set
             # (vLLM/SGLang mp backend will work smoothly only when *_VISIBLE_DEVICES is modified),
             # vLLM/SGLang init model in LLMEngine directly, assign 1 GPU for it.
-            num_gpus = 1
-            scheduling_strategy = None
+            num_gpus = num_gpus_per_actor
+            scheduling_strategy = TODO
 
         inference_engines.append(
             LLMRayActor.options(
