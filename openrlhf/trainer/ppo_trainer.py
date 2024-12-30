@@ -228,7 +228,7 @@ class PPOTrainer(ABC):
                 for i, experience in enumerate(
                         self.experience_maker.make_experience_list(rand_prompts, **self.generate_kwargs)
                 ):
-                    logging.warning(f'hi PPOTrainer.fit loop (iterate experience) {i=} {experience.sequences.shape=}')
+                    logging.warning(f'hi PPOTrainer.fit loop (iterate experience) {i=}')
                     if i == 0:
                         output = self.tokenizer.batch_decode(
                             experience.sequences[0].unsqueeze(0), skip_special_tokens=True
