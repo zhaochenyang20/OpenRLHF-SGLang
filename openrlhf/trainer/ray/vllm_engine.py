@@ -210,7 +210,7 @@ def create_inference_engines(
 
         inference_engines.append(
             LLMRayActor.options(
-                num_cpus=1,
+                num_cpus=num_gpus,
                 num_gpus=num_gpus,
                 scheduling_strategy=scheduling_strategy,
             ).remote(
