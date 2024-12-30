@@ -158,10 +158,12 @@ class LLMRayActor:
             self.llm.llm_engine.model_executor.stop_remote_worker_execution_loop()
 
     def release_gpu_occupation(self):
+        logging.warning(f"hi LLMRayActor.release_gpu_occupation")
         if self.backend == "sglang":
             self.backend.release_gpu_occupation()
 
     def resume_gpu_occupation(self):
+        logging.warning(f"hi LLMRayActor.resume_gpu_occupation")
         if self.backend == "sglang":
             self.backend.resume_gpu_occupation()
 
