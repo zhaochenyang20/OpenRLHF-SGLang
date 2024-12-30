@@ -157,6 +157,14 @@ class LLMRayActor:
         if self.__version__ > "0.4.2":
             self.llm.llm_engine.model_executor.stop_remote_worker_execution_loop()
 
+    def release_gpu_occupation(self):
+        if self.backend == "sglang":
+            self.backend.release_gpu_occupation()
+
+    def resume_gpu_occupation(self):
+        if self.backend == "sglang":
+            self.backend.resume_gpu_occupation()
+
 
 def create_inference_engines(
     num_engines: int,
