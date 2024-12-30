@@ -134,7 +134,7 @@ class LLMRayActor:
                 )
         elif self.backend == "sglang":
             return self.llm.init_weights_update_group(
-                master_address, master_port, rank_offset, world_size, group_name, backend=backend
+                master_address, master_port, rank_offset, world_size, group_name, backend="nccl"
             )
 
     def update_weight(self, name, dtype, shape, empty_cache=False):

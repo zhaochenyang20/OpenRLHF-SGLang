@@ -8,6 +8,8 @@ from typing import Callable, Dict, List
 import deepspeed
 import ray
 import torch
+from transformers.trainer import get_scheduler
+
 from openrlhf.datasets import PromptDataset, SFTDataset
 from openrlhf.models import Actor
 from openrlhf.trainer import PPOTrainer
@@ -15,19 +17,18 @@ from openrlhf.trainer.ppo_utils import Experience, RemoteExperienceMaker
 from openrlhf.utils import blending_datasets, get_tokenizer
 from openrlhf.utils.deepspeed import DeepspeedStrategy
 from openrlhf.utils.distributed_util import init_process_group
-from transformers.trainer import get_scheduler
 
 from .launcher import BasePPORole
 
 
 class ActorPPOTrainer(PPOTrainer):
     def __init__(
-            self,
-            *args,
-            inference_engines: List = None,
-            remote_rm_url: List[str] = None,
-            critic_train_remote: bool = False,
-            **kwargs,
+        self,
+        *args,
+        inference_engines: List = None,
+        remote_rm_url: List[str] = None,
+        critic_train_remote: bool = False,
+        **kwargs,
     ):
         """PPOTrainer for ray.
 
@@ -92,12 +93,12 @@ class ActorPPOTrainer(PPOTrainer):
                     i * vllm_tensor_parallel_size + 1,
                     world_size,
                     "openrlhf",
-                    backend=backend,
+                    backend="nccl",
                 )
                 for i, engine in enumerate(self.inference_engines)
             ]
             self._model_update_group = init_process_group(
-                backend=backend,
+                backend="nccl",
                 init_method=f"tcp://{master_address}:{master_port}",
                 world_size=world_size,
                 rank=0,
@@ -242,7 +243,7 @@ class ActorModelRayActor(BasePPORole):
 
         # configure scheduler
         self.num_update_steps_per_episodes = (
-                len(self.prompts_dataset) * args.n_samples_per_prompt // args.train_batch_size * args.max_epochs
+            len(self.prompts_dataset) * args.n_samples_per_prompt // args.train_batch_size * args.max_epochs
         )
         max_steps = math.ceil(args.num_episodes * self.num_update_steps_per_episodes)
         self._max_steps = max_steps
@@ -344,14 +345,14 @@ class ActorModelRayActor(BasePPORole):
         return self._max_steps
 
     def fit(
-            self,
-            critic_model: ray.actor.ActorHandle,
-            initial_model: ray.actor.ActorHandle,
-            reward_model: List[ray.actor.ActorHandle],
-            remote_rm_url: List[str] = None,
-            reward_fn: Callable[[List[torch.Tensor]], torch.Tensor] = None,
-            inference_engines: List[ray.actor.ActorHandle] = None,
-            critic_train_remote: bool = False,
+        self,
+        critic_model: ray.actor.ActorHandle,
+        initial_model: ray.actor.ActorHandle,
+        reward_model: List[ray.actor.ActorHandle],
+        remote_rm_url: List[str] = None,
+        reward_fn: Callable[[List[torch.Tensor]], torch.Tensor] = None,
+        inference_engines: List[ray.actor.ActorHandle] = None,
+        critic_train_remote: bool = False,
     ):
         """Train actor model with prompt datasets."""
         strategy = self.strategy
