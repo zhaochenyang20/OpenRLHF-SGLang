@@ -1,12 +1,12 @@
+import logging
 import time
 
 import ray
 import torch
-from ray.util.placement_group import placement_group
-from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
-
 from openrlhf.trainer.ray.utils import ray_noset_visible_devices
 from openrlhf.utils.logging_utils import init_logger
+from ray.util.placement_group import placement_group
+from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
 
 logger = init_logger(__name__)
 
@@ -21,7 +21,7 @@ def get_all_env_variables():
 @ray.remote
 class LLMRayActor:
     def __init__(self, *args, **kwargs):
-        #! TODO chenyang check engine params
+        # ! TODO chenyang check engine params
         self.backend = kwargs["backend"]
         torch.cuda.synchronize()
         start = time.time()
@@ -44,7 +44,7 @@ class LLMRayActor:
             else:
                 # RayGPUExecutor
                 # See the patch https://github.com/vllm-project/vllm/commit/479d69fad0538f04cb22bf13e76ff91cfeb8a4e5
-                #! worker_use_ray is a vllm only parameter
+                # ! worker_use_ray is a vllm only parameter
                 kwargs["worker_use_ray"] = True
 
                 if vllm.__version__ > "0.6.4.post1":
@@ -65,7 +65,7 @@ class LLMRayActor:
         elif kwargs["backend"] == "sglang":
             import sglang
 
-            #! TODO chenyang check engine params
+            # ! TODO chenyang check engine params
             sglang_params = {
                 "model_path": args[0],  # pretrain path
                 "trust_remote_code": kwargs.get("trust_remote_code", True),
@@ -104,6 +104,7 @@ class LLMRayActor:
 
             # min_tokens, include_stop_str_in_output is not used in sglang
 
+            logging.warning(f'hi LLMRayActor.generate {type(all_prompts)=}')
             sampling_params = dict(
                 max_new_tokens=sampling_params.max_tokens,
                 top_p=sampling_params.top_p,
@@ -135,6 +136,7 @@ class LLMRayActor:
             )
 
     def update_weight(self, name, dtype, shape, empty_cache=False):
+        logging.warning(f'hi LLMRayActor.update_weight {name=} {dtype=} {shape=}')
         if self.backend == "vllm":
             self.stop_remote_worker_execution_loop()
 
@@ -156,14 +158,14 @@ class LLMRayActor:
 
 
 def create_inference_engines(
-    num_engines: int,
-    tensor_parallel_size: int,
-    pretrain: str,
-    seed: int,
-    enable_prefix_caching: bool,
-    enforce_eager: bool,
-    max_model_len: int,
-    backend: str = "vllm",
+        num_engines: int,
+        tensor_parallel_size: int,
+        pretrain: str,
+        seed: int,
+        enable_prefix_caching: bool,
+        enforce_eager: bool,
+        max_model_len: int,
+        backend: str = "vllm",
 ):
     print(f"backend: {backend}")
     inference_engines = []
