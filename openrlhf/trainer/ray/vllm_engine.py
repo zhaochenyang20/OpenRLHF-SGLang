@@ -203,7 +203,7 @@ def create_inference_engines(
             # vLLM/SGLang init model in LLMEngine directly, assign 1 GPU for it.
             num_gpus = num_gpus_per_actor
             scheduling_strategy = PlacementGroupSchedulingStrategy(
-                placement_group=pg, placement_group_capture_child_tasks=True, placement_group_bundle_index=0
+                placement_group=pg, placement_group_bundle_index=0
             )
 
         inference_engines.append(
