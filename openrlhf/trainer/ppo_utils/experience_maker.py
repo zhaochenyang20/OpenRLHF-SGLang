@@ -679,6 +679,8 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
         all_outputs = sum(ray.get(all_output_refs), [])
         assert len(all_outputs) == len(all_prompts)
 
+        ray.get([llm.release_gpu_occupation.remote() for llm in llms])
+
         samples_list = []
         for i in range(0, len(all_outputs), args.micro_rollout_batch_size):
             outputs = all_outputs[i : i + self.strategy.args.micro_rollout_batch_size]
