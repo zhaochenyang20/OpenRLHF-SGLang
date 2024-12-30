@@ -7,12 +7,11 @@ from typing import List, Optional, Tuple, Union
 import ray
 import torch
 import torch.nn as nn
-from tqdm import tqdm
-
 from openrlhf.models.actor import Actor
 from openrlhf.models.utils import compute_approx_kl, compute_reward, masked_mean, unpacking_samples
 from openrlhf.utils.logging_utils import init_logger
 from openrlhf.utils.remote_rm_utils import remote_rm_fn, remote_rm_fn_ray
+from tqdm import tqdm
 
 logger = init_logger(__name__)
 
@@ -121,17 +120,17 @@ class NaiveExperienceMaker(ABC):
     """
 
     def __init__(
-        self,
-        actor: Actor,
-        critic: nn.Module,
-        reward_model: nn.Module,
-        initial_model: Actor,
-        tokenizer,
-        prompt_max_len: int,
-        kl_controller,
-        strategy=None,
-        remote_rm_url: str = None,
-        reward_fn=None,
+            self,
+            actor: Actor,
+            critic: nn.Module,
+            reward_model: nn.Module,
+            initial_model: Actor,
+            tokenizer,
+            prompt_max_len: int,
+            kl_controller,
+            strategy=None,
+            remote_rm_url: str = None,
+            reward_fn=None,
     ) -> None:
         super().__init__()
         self.actor = actor
@@ -183,9 +182,9 @@ class NaiveExperienceMaker(ABC):
 
         experiences = []
         for samples in tqdm(
-            samples_list,
-            desc="make_experience",
-            disable=not self.strategy.is_rank_0(),
+                samples_list,
+                desc="make_experience",
+                disable=not self.strategy.is_rank_0(),
         ):
             experiences.append(self.make_experience(samples).to_device("cpu"))
 
@@ -242,6 +241,7 @@ class NaiveExperienceMaker(ABC):
         """
         Generate samples and return in batches.
         """
+        print(f'hi NaiveExperienceMaker.generate_samples start {len(all_prompts)=}')
         assert not getattr(self, "packing_samples", False)
         args = self.strategy.args
         self.actor.eval()
@@ -249,7 +249,9 @@ class NaiveExperienceMaker(ABC):
         all_prompts = sum([[prompt] * args.n_samples_per_prompt for prompt in all_prompts], [])
         samples_list = []
         for i in range(0, len(all_prompts), args.micro_rollout_batch_size):
-            prompts = all_prompts[i : i + args.micro_rollout_batch_size]
+            print(
+                f'hi NaiveExperienceMaker.generate_samples loop (micro rollout) {i=} {args.micro_rollout_batch_size=}')
+            prompts = all_prompts[i: i + args.micro_rollout_batch_size]
             inputs = self.tokenize_fn(prompts, self.prompt_max_len, device="cuda")
             sequences, attention_mask, action_mask = self.actor.generate(**inputs, **generate_kwargs)
             samples = Samples(
@@ -357,12 +359,12 @@ class NaiveExperienceMaker(ABC):
 
     @torch.no_grad()
     def get_advantages_and_returns(
-        self,
-        values: torch.Tensor,
-        rewards: torch.Tensor,
-        action_mask: torch.Tensor,
-        gamma: float,
-        lambd: float,
+            self,
+            values: torch.Tensor,
+            rewards: torch.Tensor,
+            action_mask: torch.Tensor,
+            gamma: float,
+            lambd: float,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Function that computes advantages and returns from rewards and values.
         Calculated as in the original PPO paper: https://arxiv.org/abs/1707.06347
@@ -415,10 +417,10 @@ class NaiveExperienceMaker(ABC):
 
     @torch.no_grad()
     def get_cumulative_returns(
-        self,
-        rewards: torch.Tensor,
-        action_mask: torch.Tensor,
-        gamma: float,
+            self,
+            rewards: torch.Tensor,
+            action_mask: torch.Tensor,
+            gamma: float,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Function that computes advantages and returns from rewards using REINFORCE.
@@ -551,7 +553,7 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
                 offset = 0
                 tokens_list = sequences_cpu.tolist()[0]
                 for length in packed_seq_lens:
-                    sequences_list.append(tokens_list[offset : offset + length])
+                    sequences_list.append(tokens_list[offset: offset + length])
                     offset += length
                 queries = self.tokenizer.batch_decode(sequences_list, skip_special_tokens=False)
 
@@ -663,7 +665,7 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
         all_output_refs = []
         batch_size = (len(all_prompt_token_ids) + len(llms) - 1) // len(llms)
         for i, llm in enumerate(llms):
-            prompt_token_ids = all_prompt_token_ids[i * batch_size : (i + 1) * batch_size]
+            prompt_token_ids = all_prompt_token_ids[i * batch_size: (i + 1) * batch_size]
             if prompt_token_ids:
                 all_output_refs.append(
                     llm.generate.remote(sampling_params=sampling_params, prompt_token_ids=prompt_token_ids)
@@ -674,7 +676,7 @@ class RemoteExperienceMaker(NaiveExperienceMaker):
 
         samples_list = []
         for i in range(0, len(all_outputs), args.micro_rollout_batch_size):
-            outputs = all_outputs[i : i + self.strategy.args.micro_rollout_batch_size]
+            outputs = all_outputs[i: i + self.strategy.args.micro_rollout_batch_size]
             if not self.packing_samples:
                 # NOTE: concat all outputs to following format:
                 #

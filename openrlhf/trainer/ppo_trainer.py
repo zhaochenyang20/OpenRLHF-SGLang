@@ -227,7 +227,7 @@ class PPOTrainer(ABC):
                 for i, experience in enumerate(
                         self.experience_maker.make_experience_list(rand_prompts, **self.generate_kwargs)
                 ):
-                    print(f'hi PPOTrainer.fit loop (iterate experience) {i=} {experience=}')
+                    print(f'hi PPOTrainer.fit loop (iterate experience) {i=} {experience.sequences.shape=}')
                     if i == 0:
                         output = self.tokenizer.batch_decode(
                             experience.sequences[0].unsqueeze(0), skip_special_tokens=True
@@ -280,7 +280,7 @@ class PPOTrainer(ABC):
                 disable=not self.strategy.is_rank_0(),
             )
             for experience in pbar:
-                print(f'hi PPOTrainer.ppo_train loop (iterate experience) {experience=}')
+                print(f'hi PPOTrainer.ppo_train loop (iterate experience)')
                 experience.to_device(device)
                 status = self.training_step(experience, global_steps)
 
