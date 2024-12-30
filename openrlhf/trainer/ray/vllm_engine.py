@@ -4,11 +4,10 @@ from typing import Optional
 
 import ray
 import torch
-from ray.util.placement_group import placement_group, PlacementGroup
-from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
-
 from openrlhf.trainer.ray.utils import ray_noset_visible_devices
 from openrlhf.utils.logging_utils import init_logger
+from ray.util.placement_group import placement_group, PlacementGroup
+from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
 
 logger = init_logger(__name__)
 
@@ -170,16 +169,16 @@ class LLMRayActor:
 
 
 def create_inference_engines(
-    num_engines: int,
-    tensor_parallel_size: int,
-    pretrain: str,
-    seed: int,
-    enable_prefix_caching: bool,
-    enforce_eager: bool,
-    max_model_len: int,
-    num_gpus_per_actor: int,
-    pg: Optional[PlacementGroup],
-    backend: str = "vllm",
+        num_engines: int,
+        tensor_parallel_size: int,
+        pretrain: str,
+        seed: int,
+        enable_prefix_caching: bool,
+        enforce_eager: bool,
+        max_model_len: int,
+        num_gpus_per_actor: int,
+        pg: Optional[PlacementGroup],
+        backend: str = "vllm",
 ):
     print(f"backend: {backend}")
     inference_engines = []
@@ -187,20 +186,21 @@ def create_inference_engines(
     # So we need to get env variables from ray process to check if it is set.
     noset_visible_devices = ray_noset_visible_devices(ray.get(get_all_env_variables.remote()))
     for i in range(num_engines):
-        # When tensor_parallel_size=1 and RAY_EXPERIMENTAL_NOSET_*_VISIBLE_DEVICES is not set
-        # (vLLM/SGLang mp backend will work smoothly only when *_VISIBLE_DEVICES is modified),
-        # vLLM/SGLang init model in LLMEngine directly, assign 1 GPU for it.
-        num_gpus = int(tensor_parallel_size == 1 and not noset_visible_devices) * num_gpus_per_actor
-        scheduling_strategy = None
-
         if tensor_parallel_size > 1 or noset_visible_devices:
             bundles = [{"GPU": 1, "CPU": 1}] * tensor_parallel_size
             pg = placement_group(bundles)
             ray.get(pg.ready())
 
+            num_gpus = 0
             scheduling_strategy = PlacementGroupSchedulingStrategy(
                 placement_group=pg, placement_group_capture_child_tasks=True, placement_group_bundle_index=0
             )
+        else:
+            # When tensor_parallel_size=1 and RAY_EXPERIMENTAL_NOSET_*_VISIBLE_DEVICES is not set
+            # (vLLM/SGLang mp backend will work smoothly only when *_VISIBLE_DEVICES is modified),
+            # vLLM/SGLang init model in LLMEngine directly, assign 1 GPU for it.
+            num_gpus = 1
+            scheduling_strategy = None
 
         inference_engines.append(
             LLMRayActor.options(
