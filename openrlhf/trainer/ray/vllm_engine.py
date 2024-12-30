@@ -187,6 +187,8 @@ def create_inference_engines(
     noset_visible_devices = ray_noset_visible_devices(ray.get(get_all_env_variables.remote()))
     for i in range(num_engines):
         if tensor_parallel_size > 1 or noset_visible_devices:
+            assert pg is None
+
             bundles = [{"GPU": 1, "CPU": 1}] * tensor_parallel_size
             pg = placement_group(bundles)
             ray.get(pg.ready())
@@ -200,7 +202,9 @@ def create_inference_engines(
             # (vLLM/SGLang mp backend will work smoothly only when *_VISIBLE_DEVICES is modified),
             # vLLM/SGLang init model in LLMEngine directly, assign 1 GPU for it.
             num_gpus = num_gpus_per_actor
-            scheduling_strategy = TODO
+            scheduling_strategy = PlacementGroupSchedulingStrategy(
+                placement_group=pg, placement_group_capture_child_tasks=True, placement_group_bundle_index=0
+            )
 
         inference_engines.append(
             LLMRayActor.options(
