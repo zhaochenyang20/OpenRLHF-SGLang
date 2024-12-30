@@ -4,8 +4,6 @@ from typing import List
 
 import ray
 import torch
-from ray.util.placement_group import placement_group
-
 from openrlhf.trainer.ray import (
     ActorModelRayActor,
     CriticModelRayActor,
@@ -15,6 +13,7 @@ from openrlhf.trainer.ray import (
     create_inference_engines,
 )
 from openrlhf.utils import get_strategy
+from ray.util.placement_group import placement_group
 
 
 # NOTE: reward function for multiple reward models, replace this with your own function!
@@ -26,20 +25,20 @@ def _validate_args(args):
     actor_world_size = args.actor_num_nodes * args.actor_num_gpus_per_node
 
     assert (
-        args.rollout_batch_size % actor_world_size == 0
+            args.rollout_batch_size % actor_world_size == 0
     ), f"rollout_bach_size must be divisible by actor_world_size, got {args.rollout_batch_size} and {actor_world_size}"
 
     assert args.zero_stage != 3 or args.vllm_num_engines > 0, f"ZeRO-3 is only supported when vLLM enabled"
 
     if args.vllm_num_engines > 0:
         assert (
-            actor_world_size % args.vllm_num_engines == 0
+                actor_world_size % args.vllm_num_engines == 0
         ), f"actor_world_size must be divisible by vllm_num_engines, got {actor_world_size} and {args.vllm_num_engines}"
 
     if args.critic_pretrain:
         critic_world_size = args.critic_num_nodes * args.critic_num_gpus_per_node
         assert (
-            actor_world_size % critic_world_size == 0
+                actor_world_size % critic_world_size == 0
         ), f"actor_world_size must be divisible by critic_world_size, got {actor_world_size} and {critic_world_size}"
 
 
@@ -53,7 +52,7 @@ def train(args):
     pg = None
     if args.colocate_actor_ref:
         assert (
-            args.actor_num_nodes == args.ref_num_nodes and args.actor_num_gpus_per_node == args.ref_num_gpus_per_node
+                args.actor_num_nodes == args.ref_num_nodes and args.actor_num_gpus_per_node == args.ref_num_gpus_per_node
         ), f"num_nodes and num_gpus_per_node must be the same when colocate actor and ref model."
 
         bundles = [
@@ -92,8 +91,8 @@ def train(args):
     pg = None
     if args.critic_pretrain and args.colocate_critic_reward:
         assert (
-            args.critic_num_nodes == args.reward_num_nodes
-            and args.critic_num_gpus_per_node == args.reward_num_gpus_per_node
+                args.critic_num_nodes == args.reward_num_nodes
+                and args.critic_num_gpus_per_node == args.reward_num_gpus_per_node
         ), f"num_nodes and num_gpus_per_node must be the same when colocate critic and reward model."
 
         bundles = [
@@ -223,6 +222,12 @@ if __name__ == "__main__":
     parser.add_argument("--vllm_sync_backend", type=str, default="nccl", help="DeepSpeed -> vLLM weight sync backend")
     parser.add_argument("--enable_prefix_caching", action="store_true", default=False)
     parser.add_argument("--enforce_eager", action="store_true", default=False, help="Disable CUDA graph in vLLM")
+    parser.add_argument(
+        "--colocate_actor_vllm",
+        action="store_true",
+        default=False,
+        help="whether to colocate actor and vllm model, if true, they will share same gpus.",
+    )
 
     # Checkpoints
     parser.add_argument("--eval_steps", type=int, default=-1)
