@@ -241,7 +241,7 @@ class NaiveExperienceMaker(ABC):
         """
         Generate samples and return in batches.
         """
-        print(f'hi NaiveExperienceMaker.generate_samples start {len(all_prompts)=}')
+        logging.warning(f'hi NaiveExperienceMaker.generate_samples start {len(all_prompts)=}')
         assert not getattr(self, "packing_samples", False)
         args = self.strategy.args
         self.actor.eval()
@@ -249,7 +249,7 @@ class NaiveExperienceMaker(ABC):
         all_prompts = sum([[prompt] * args.n_samples_per_prompt for prompt in all_prompts], [])
         samples_list = []
         for i in range(0, len(all_prompts), args.micro_rollout_batch_size):
-            print(
+            logging.warning(
                 f'hi NaiveExperienceMaker.generate_samples loop (micro rollout) {i=} {args.micro_rollout_batch_size=}')
             prompts = all_prompts[i: i + args.micro_rollout_batch_size]
             inputs = self.tokenize_fn(prompts, self.prompt_max_len, device="cuda")
