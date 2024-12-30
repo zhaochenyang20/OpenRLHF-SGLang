@@ -49,7 +49,7 @@ def train(args):
     strategy = get_strategy(args)
 
     # if colocated, create placement group for actor and ref model explicitly.
-    pg = None
+    pg_actor_ref = None
     if args.colocate_actor_ref:
         assert (
                 args.actor_num_nodes == args.ref_num_nodes and args.actor_num_gpus_per_node == args.ref_num_gpus_per_node
@@ -59,8 +59,8 @@ def train(args):
             {"GPU": args.actor_num_gpus_per_node, "CPU": args.actor_num_gpus_per_node}
             for _ in range(args.actor_num_nodes)
         ]
-        pg = placement_group(bundles, strategy="STRICT_SPREAD")
-        ray.get(pg.ready())
+        pg_actor_ref = placement_group(bundles, strategy="STRICT_SPREAD")
+        ray.get(pg_actor_ref.ready())
 
     # NOTE(wuxibin): Why don't we allocate 0.5 gpu for each actor when colocate models?
     # Say we have 1 node with 4 GPUs, and num_gpus_per_node for each model is 4.
@@ -75,20 +75,20 @@ def train(args):
         args.actor_num_nodes,
         args.actor_num_gpus_per_node,
         ActorModelRayActor,
-        pg=pg,
-        num_gpus_per_actor=0.75 if pg else 1,
+        pg=pg_actor_ref,
+        num_gpus_per_actor=0.75 if pg_actor_ref else 1,
     )
 
     ref_model = PPORayActorGroup(
         args.ref_num_nodes,
         args.ref_num_gpus_per_node,
         ReferenceModelRayActor,
-        pg=pg,
-        num_gpus_per_actor=0.25 if pg else 1,
+        pg=pg_actor_ref,
+        num_gpus_per_actor=0.25 if pg_actor_ref else 1,
     )
 
     # if colocated, create placement group for critic and reward model explicitly.
-    pg = None
+    pg_critic = None
     if args.critic_pretrain and args.colocate_critic_reward:
         assert (
                 args.critic_num_nodes == args.reward_num_nodes
@@ -99,16 +99,16 @@ def train(args):
             {"GPU": args.critic_num_gpus_per_node, "CPU": args.critic_num_gpus_per_node}
             for _ in range(args.critic_num_nodes)
         ]
-        pg = placement_group(bundles, strategy="STRICT_SPREAD")
-        ray.get(pg.ready())
+        pg_critic = placement_group(bundles, strategy="STRICT_SPREAD")
+        ray.get(pg_critic.ready())
 
     if args.critic_pretrain:
         critic_model = PPORayActorGroup(
             args.critic_num_nodes,
             args.critic_num_gpus_per_node,
             CriticModelRayActor,
-            pg=pg,
-            num_gpus_per_actor=0.75 if pg else 1,
+            pg=pg_critic,
+            num_gpus_per_actor=0.75 if pg_critic else 1,
         )
     else:
         critic_model = None
@@ -123,8 +123,8 @@ def train(args):
                     args.reward_num_nodes,
                     args.reward_num_gpus_per_node,
                     RewardModelRayActor,
-                    pg=pg,
-                    num_gpus_per_actor=0.25 if pg else 1,
+                    pg=pg_critic,
+                    num_gpus_per_actor=0.25 if pg_critic else 1,
                 )
             )
     else:
