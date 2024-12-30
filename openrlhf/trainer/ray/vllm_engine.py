@@ -1,9 +1,10 @@
 import logging
 import time
+from typing import Optional
 
 import ray
 import torch
-from ray.util.placement_group import placement_group
+from ray.util.placement_group import placement_group, PlacementGroup
 from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
 
 from openrlhf.trainer.ray.utils import ray_noset_visible_devices
@@ -176,6 +177,8 @@ def create_inference_engines(
     enable_prefix_caching: bool,
     enforce_eager: bool,
     max_model_len: int,
+    num_gpus_per_actor: int,
+    pg: Optional[PlacementGroup],
     backend: str = "vllm",
 ):
     print(f"backend: {backend}")
@@ -187,7 +190,7 @@ def create_inference_engines(
         # When tensor_parallel_size=1 and RAY_EXPERIMENTAL_NOSET_*_VISIBLE_DEVICES is not set
         # (vLLM/SGLang mp backend will work smoothly only when *_VISIBLE_DEVICES is modified),
         # vLLM/SGLang init model in LLMEngine directly, assign 1 GPU for it.
-        num_gpus = int(tensor_parallel_size == 1 and not noset_visible_devices)
+        num_gpus = int(tensor_parallel_size == 1 and not noset_visible_devices) * num_gpus_per_actor
         scheduling_strategy = None
 
         if tensor_parallel_size > 1 or noset_visible_devices:
