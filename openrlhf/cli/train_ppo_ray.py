@@ -61,9 +61,21 @@ def train(args):
         ]
         pg_actor_ref = placement_group(bundles, strategy="STRICT_SPREAD")
         ray.get(pg_actor_ref.ready())
-    if args.colocate_actor_vllm:
-        assert args.colocate_actor_ref, 'When using colocate_actor_vllm, must also use colocate_actor_ref'
-        assert args.actor_num_nodes == args.vllm_num_engines, f"num_engines be the same when colocate actor and vllm model."
+
+        if args.colocate_actor_vllm:
+            assert args.colocate_actor_ref, 'When using colocate_actor_vllm, must also use colocate_actor_ref'
+            assert args.actor_num_nodes == args.vllm_num_engines, f"num_engines be the same when colocate actor and vllm model."
+            num_gpus_per_actor_actor = 0.625
+            num_gpus_per_actor_ref = 0.25
+            num_gpus_per_actor_vllm = 0.125
+        else:
+            num_gpus_per_actor_actor = 0.75
+            num_gpus_per_actor_ref = 0.25
+            num_gpus_per_actor_vllm = 1
+    else:
+        num_gpus_per_actor_actor = 1
+        num_gpus_per_actor_ref = 1
+        num_gpus_per_actor_vllm = 1
 
     # NOTE(wuxibin): Why don't we allocate 0.5 gpu for each actor when colocate models?
     # Say we have 1 node with 4 GPUs, and num_gpus_per_node for each model is 4.
@@ -79,7 +91,7 @@ def train(args):
         args.actor_num_gpus_per_node,
         ActorModelRayActor,
         pg=pg_actor_ref,
-        num_gpus_per_actor=0.75 if pg_actor_ref else 1,
+        num_gpus_per_actor=num_gpus_per_actor_actor,
     )
 
     ref_model = PPORayActorGroup(
@@ -87,7 +99,7 @@ def train(args):
         args.ref_num_gpus_per_node,
         ReferenceModelRayActor,
         pg=pg_actor_ref,
-        num_gpus_per_actor=0.25 if pg_actor_ref else 1,
+        num_gpus_per_actor=num_gpus_per_actor_ref,
     )
 
     # if colocated, create placement group for critic and reward model explicitly.
@@ -155,6 +167,8 @@ def train(args):
             args.enforce_eager,
             max_len,
             backend=args.backend,
+            num_gpus_per_actor=num_gpus_per_actor_vllm,
+            pg=pg_actor_ref if args.colocate_actor_vllm else None,
         )
 
     ray.get(refs)
