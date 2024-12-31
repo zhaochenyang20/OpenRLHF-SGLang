@@ -15,6 +15,7 @@ from openrlhf.trainer.ray import (
     create_inference_engines,
 )
 from openrlhf.utils import get_strategy
+from openrlhf.utils.utils import configure_logging
 
 
 # NOTE: reward function for multiple reward models, replace this with your own function!
@@ -44,6 +45,7 @@ def _validate_args(args):
 
 
 def train(args):
+    configure_logging()
     _validate_args(args)
 
     # configure strategy

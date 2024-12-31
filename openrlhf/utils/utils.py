@@ -1,8 +1,9 @@
+import logging
 import os
+import sys
 
 from datasets import interleave_datasets, load_dataset, load_from_disk
 from transformers import AutoTokenizer
-
 
 DEFAULT_PAD_TOKEN = "[PAD]"
 DEFAULT_EOS_TOKEN = "</s>"
@@ -39,15 +40,15 @@ def get_strategy(args):
 
 
 def blending_datasets(
-    datasets,
-    probabilities,
-    strategy=None,
-    seed=42,
-    max_count=5000000,
-    return_eval=True,
-    stopping_strategy="first_exhausted",
-    train_split="train",
-    eval_split="test",
+        datasets,
+        probabilities,
+        strategy=None,
+        seed=42,
+        max_count=5000000,
+        return_eval=True,
+        stopping_strategy="first_exhausted",
+        train_split="train",
+        eval_split="test",
 ):
     datasets = datasets.split(",")
     probabilities = list(map(float, probabilities.split(",")))
@@ -66,7 +67,7 @@ def blending_datasets(
         ext = os.path.splitext(dataset)[-1]
         # local python script
         if ext == ".py" or (
-            os.path.isdir(dataset) and os.path.exists(os.path.join(dataset, f"{dataset_basename}.py"))
+                os.path.isdir(dataset) and os.path.exists(os.path.join(dataset, f"{dataset_basename}.py"))
         ):
             data = load_dataset(dataset, trust_remote_code=True)
             strategy.print(f"loaded {dataset} with python script")
@@ -129,3 +130,12 @@ def convert_token_to_id(token, tokenizer):
         return token[0]
     else:
         raise ValueError("token should be int or str")
+
+
+def configure_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        stream=sys.stdout,
+        format='[%(asctime)s.%(msecs)03d|%(levelname)s|%(name)s] %(message)s',
+        datefmt='%H:%M:%S',
+    )
