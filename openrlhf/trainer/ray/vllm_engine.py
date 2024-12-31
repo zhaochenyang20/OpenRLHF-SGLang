@@ -4,10 +4,11 @@ from typing import Optional
 
 import ray
 import torch
+from ray.util.placement_group import PlacementGroup, placement_group
+from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
+
 from openrlhf.trainer.ray.utils import ray_noset_visible_devices
 from openrlhf.utils.logging_utils import init_logger
-from ray.util.placement_group import placement_group, PlacementGroup
-from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
 
 logger = init_logger(__name__)
 
@@ -170,17 +171,17 @@ class LLMRayActor:
 
 
 def create_inference_engines(
-        num_engines: int,
-        tensor_parallel_size: int,
-        pretrain: str,
-        seed: int,
-        enable_prefix_caching: bool,
-        enforce_eager: bool,
-        mem_fraction_static: Optional[float],
-        max_model_len: int,
-        num_gpus_per_actor: float,
-        pg: Optional[PlacementGroup],
-        backend: str = "vllm",
+    num_engines: int,
+    tensor_parallel_size: int,
+    pretrain: str,
+    seed: int,
+    enable_prefix_caching: bool,
+    enforce_eager: bool,
+    mem_fraction_static: Optional[float],
+    max_model_len: int,
+    num_gpus_per_actor: float,
+    pg: Optional[PlacementGroup],
+    backend: str = "vllm",
 ):
     print(f"backend: {backend}")
     inference_engines = []
@@ -204,9 +205,7 @@ def create_inference_engines(
             # (vLLM/SGLang mp backend will work smoothly only when *_VISIBLE_DEVICES is modified),
             # vLLM/SGLang init model in LLMEngine directly, assign 1 GPU for it.
             num_gpus = num_gpus_per_actor
-            scheduling_strategy = PlacementGroupSchedulingStrategy(
-                placement_group=pg, placement_group_bundle_index=0
-            )
+            scheduling_strategy = PlacementGroupSchedulingStrategy(placement_group=pg, placement_group_bundle_index=0)
 
         inference_engines.append(
             LLMRayActor.options(
