@@ -89,7 +89,7 @@ class ReferenceModelRayActor(BasePPORole):
 
         if strategy.args.ref_reward_offload:
             model._offload = True
-        print("model._offload", model._offload)
+            print("model._offload", model._offload)
         self.model = self.strategy.prepare(model, is_rlhf=True)
         print("self.model", self.model)
         self.model.eval()
@@ -146,7 +146,7 @@ class RewardModelRayActor(BasePPORole):
 
         if strategy.args.ref_reward_offload:
             model._offload = True
-        print("model._offload", model._offload)
+            print("model._offload", model._offload)
         self.model = self.strategy.prepare(model, is_rlhf=True)
         print("self.model", self.model)
         self.model.eval()

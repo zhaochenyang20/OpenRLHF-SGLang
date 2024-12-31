@@ -128,7 +128,6 @@ class LLMRayActor:
             )
             print("outputs = self.llm.generate(all_prompts, sampling_params)")
             outputs = self.llm.generate(all_prompts, sampling_params)
-            print("outputs", outputs)
         torch.cuda.synchronize()
         end = time.time()
         print(f"Generate samples takes: {end - start}s for {self.backend}")

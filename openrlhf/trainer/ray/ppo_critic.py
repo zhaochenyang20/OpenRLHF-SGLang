@@ -106,7 +106,7 @@ class CriticModelRayActor(BasePPORole):
             self.tokenizer = get_tokenizer(
                 pretrain, critic, "left", strategy, use_fast=not strategy.args.disable_fast_tokenizer
             )
-        print("self.tokenizer", self.tokenizer)
+            print("self.tokenizer", self.tokenizer)
         # configure optimizer
         critic_optim = strategy.create_optimizer(
             critic, lr=args.critic_learning_rate, betas=args.adam_betas, weight_decay=args.l2
