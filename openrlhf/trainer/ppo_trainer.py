@@ -227,18 +227,18 @@ class PPOTrainer(ABC):
             )
 
             for rand_prompts in self.prompts_dataloader:
-                print("rand_prompts", rand_prompts)
+                print("rand_prompts")
                 for i, experience in enumerate(
                     self.experience_maker.make_experience_list(rand_prompts, **self.generate_kwargs)
                 ):
-                    print("experience", experience)
+                    print("experience")
                     if i == 0:
-                        print("experience.sequences", experience.sequences)
+                        print("experience.sequences")
                         output = self.tokenizer.batch_decode(
                             experience.sequences[0].unsqueeze(0), skip_special_tokens=True
                         )
                         self.strategy.print(output)
-                        print("experience.sequences[0]", experience.sequences[0])
+                        print("experience.sequences[0]")
                     self.replay_buffer.append(experience)
                     print("self.replay_buffer.append(experience)")
 
