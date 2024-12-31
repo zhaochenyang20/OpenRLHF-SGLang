@@ -1,8 +1,10 @@
+import logging
 import time
+from typing import Optional
 
 import ray
 import torch
-from ray.util.placement_group import placement_group
+from ray.util.placement_group import PlacementGroup, placement_group
 from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
 
 from openrlhf.trainer.ray.utils import ray_noset_visible_devices
@@ -21,7 +23,7 @@ def get_all_env_variables():
 @ray.remote
 class LLMRayActor:
     def __init__(self, *args, **kwargs):
-        #! TODO chenyang check engine params
+        # ! TODO chenyang check engine params
         self.backend = kwargs["backend"]
         torch.cuda.synchronize()
         start = time.time()
@@ -44,7 +46,7 @@ class LLMRayActor:
             else:
                 # RayGPUExecutor
                 # See the patch https://github.com/vllm-project/vllm/commit/479d69fad0538f04cb22bf13e76ff91cfeb8a4e5
-                #! worker_use_ray is a vllm only parameter
+                # ! worker_use_ray is a vllm only parameter
                 kwargs["worker_use_ray"] = True
 
                 if vllm.__version__ > "0.6.4.post1":
@@ -65,7 +67,7 @@ class LLMRayActor:
         elif kwargs["backend"] == "sglang":
             import sglang
 
-            #! TODO chenyang check engine params
+            # ! TODO chenyang check engine params
             sglang_params = {
                 "model_path": args[0],  # pretrain path
                 "trust_remote_code": kwargs.get("trust_remote_code", True),
@@ -79,6 +81,7 @@ class LLMRayActor:
                 "context_length": kwargs.get("max_model_len", None),
                 "log_level": "info",
                 "return_token_ids": True,
+                "mem_fraction_static": kwargs.get("mem_fraction_static", None),
             }
             self.llm = sglang.Engine(**sglang_params)
 
@@ -104,6 +107,7 @@ class LLMRayActor:
 
             # min_tokens, include_stop_str_in_output is not used in sglang
 
+            logging.warning(f"hi LLMRayActor.generate {type(all_prompts)=}")
             sampling_params = dict(
                 max_new_tokens=sampling_params.max_tokens,
                 top_p=sampling_params.top_p,
@@ -131,10 +135,11 @@ class LLMRayActor:
                 )
         elif self.backend == "sglang":
             return self.llm.init_weights_update_group(
-                master_address, master_port, rank_offset, world_size, group_name, backend="nccl"
+                master_address, master_port, rank_offset, world_size, group_name, backend=backend
             )
 
     def update_weight(self, name, dtype, shape, empty_cache=False):
+        logging.warning(f"hi LLMRayActor.update_weight {name=} {dtype=} {shape=}")
         if self.backend == "vllm":
             self.stop_remote_worker_execution_loop()
 
@@ -154,6 +159,16 @@ class LLMRayActor:
         if self.__version__ > "0.4.2":
             self.llm.llm_engine.model_executor.stop_remote_worker_execution_loop()
 
+    def release_gpu_occupation(self):
+        logging.warning(f"hi LLMRayActor.release_gpu_occupation")
+        if self.backend == "sglang":
+            self.llm.release_gpu_occupation()
+
+    def resume_gpu_occupation(self):
+        logging.warning(f"hi LLMRayActor.resume_gpu_occupation")
+        if self.backend == "sglang":
+            self.llm.resume_gpu_occupation()
+
 
 def create_inference_engines(
     num_engines: int,
@@ -162,7 +177,10 @@ def create_inference_engines(
     seed: int,
     enable_prefix_caching: bool,
     enforce_eager: bool,
+    mem_fraction_static: Optional[float],
     max_model_len: int,
+    num_gpus_per_actor: float,
+    pg: Optional[PlacementGroup],
     backend: str = "vllm",
 ):
     print(f"backend: {backend}")
@@ -171,24 +189,27 @@ def create_inference_engines(
     # So we need to get env variables from ray process to check if it is set.
     noset_visible_devices = ray_noset_visible_devices(ray.get(get_all_env_variables.remote()))
     for i in range(num_engines):
-        # When tensor_parallel_size=1 and RAY_EXPERIMENTAL_NOSET_*_VISIBLE_DEVICES is not set
-        # (vLLM/SGLang mp backend will work smoothly only when *_VISIBLE_DEVICES is modified),
-        # vLLM/SGLang init model in LLMEngine directly, assign 1 GPU for it.
-        num_gpus = int(tensor_parallel_size == 1 and not noset_visible_devices)
-        scheduling_strategy = None
-
         if tensor_parallel_size > 1 or noset_visible_devices:
+            assert pg is None
+
             bundles = [{"GPU": 1, "CPU": 1}] * tensor_parallel_size
             pg = placement_group(bundles)
             ray.get(pg.ready())
 
+            num_gpus = 0
             scheduling_strategy = PlacementGroupSchedulingStrategy(
                 placement_group=pg, placement_group_capture_child_tasks=True, placement_group_bundle_index=0
             )
+        else:
+            # When tensor_parallel_size=1 and RAY_EXPERIMENTAL_NOSET_*_VISIBLE_DEVICES is not set
+            # (vLLM/SGLang mp backend will work smoothly only when *_VISIBLE_DEVICES is modified),
+            # vLLM/SGLang init model in LLMEngine directly, assign 1 GPU for it.
+            num_gpus = num_gpus_per_actor
+            scheduling_strategy = PlacementGroupSchedulingStrategy(placement_group=pg, placement_group_bundle_index=0)
 
         inference_engines.append(
             LLMRayActor.options(
-                num_cpus=1,
+                num_cpus=num_gpus,
                 num_gpus=num_gpus,
                 scheduling_strategy=scheduling_strategy,
             ).remote(
@@ -201,6 +222,7 @@ def create_inference_engines(
                 enable_prefix_caching=enable_prefix_caching,
                 enforce_eager=enforce_eager,
                 max_model_len=max_model_len,
+                mem_fraction_static=mem_fraction_static,
                 backend=backend,
             )
         )

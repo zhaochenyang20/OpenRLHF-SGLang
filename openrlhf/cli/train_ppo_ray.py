@@ -50,7 +50,7 @@ def train(args):
     strategy = get_strategy(args)
 
     # if colocated, create placement group for actor and ref model explicitly.
-    pg = None
+    pg_actor_ref = None
     if args.colocate_actor_ref:
         assert (
             args.actor_num_nodes == args.ref_num_nodes and args.actor_num_gpus_per_node == args.ref_num_gpus_per_node
@@ -60,8 +60,25 @@ def train(args):
             {"GPU": args.actor_num_gpus_per_node, "CPU": args.actor_num_gpus_per_node}
             for _ in range(args.actor_num_nodes)
         ]
-        pg = placement_group(bundles, strategy="STRICT_SPREAD")
-        ray.get(pg.ready())
+        pg_actor_ref = placement_group(bundles, strategy="STRICT_SPREAD")
+        ray.get(pg_actor_ref.ready())
+
+        if args.colocate_actor_vllm:
+            assert args.colocate_actor_ref, "When using colocate_actor_vllm, must also use colocate_actor_ref"
+            assert (
+                args.actor_num_nodes == args.vllm_num_engines
+            ), f"num_engines be the same when colocate actor and vllm model."
+            num_gpus_per_actor_actor = 0.625
+            num_gpus_per_actor_ref = 0.25
+            num_gpus_per_actor_vllm = 0.125
+        else:
+            num_gpus_per_actor_actor = 0.75
+            num_gpus_per_actor_ref = 0.25
+            num_gpus_per_actor_vllm = 1
+    else:
+        num_gpus_per_actor_actor = 1
+        num_gpus_per_actor_ref = 1
+        num_gpus_per_actor_vllm = 1
 
     # NOTE(wuxibin): Why don't we allocate 0.5 gpu for each actor when colocate models?
     # Say we have 1 node with 4 GPUs, and num_gpus_per_node for each model is 4.
@@ -76,20 +93,20 @@ def train(args):
         args.actor_num_nodes,
         args.actor_num_gpus_per_node,
         ActorModelRayActor,
-        pg=pg,
-        num_gpus_per_actor=0.75 if pg else 1,
+        pg=pg_actor_ref,
+        num_gpus_per_actor=num_gpus_per_actor_actor,
     )
 
     ref_model = PPORayActorGroup(
         args.ref_num_nodes,
         args.ref_num_gpus_per_node,
         ReferenceModelRayActor,
-        pg=pg,
-        num_gpus_per_actor=0.25 if pg else 1,
+        pg=pg_actor_ref,
+        num_gpus_per_actor=num_gpus_per_actor_ref,
     )
 
     # if colocated, create placement group for critic and reward model explicitly.
-    pg = None
+    pg_critic = None
     if args.critic_pretrain and args.colocate_critic_reward:
         assert (
             args.critic_num_nodes == args.reward_num_nodes
@@ -100,16 +117,16 @@ def train(args):
             {"GPU": args.critic_num_gpus_per_node, "CPU": args.critic_num_gpus_per_node}
             for _ in range(args.critic_num_nodes)
         ]
-        pg = placement_group(bundles, strategy="STRICT_SPREAD")
-        ray.get(pg.ready())
+        pg_critic = placement_group(bundles, strategy="STRICT_SPREAD")
+        ray.get(pg_critic.ready())
 
     if args.critic_pretrain:
         critic_model = PPORayActorGroup(
             args.critic_num_nodes,
             args.critic_num_gpus_per_node,
             CriticModelRayActor,
-            pg=pg,
-            num_gpus_per_actor=0.75 if pg else 1,
+            pg=pg_critic,
+            num_gpus_per_actor=0.75 if pg_critic else 1,
         )
     else:
         critic_model = None
@@ -124,8 +141,8 @@ def train(args):
                     args.reward_num_nodes,
                     args.reward_num_gpus_per_node,
                     RewardModelRayActor,
-                    pg=pg,
-                    num_gpus_per_actor=0.25 if pg else 1,
+                    pg=pg_critic,
+                    num_gpus_per_actor=0.25 if pg_critic else 1,
                 )
             )
     else:
@@ -151,8 +168,11 @@ def train(args):
             args.seed,
             args.enable_prefix_caching,
             args.enforce_eager,
+            args.mem_fraction_static,
             max_len,
             backend=args.backend,
+            num_gpus_per_actor=num_gpus_per_actor_vllm,
+            pg=pg_actor_ref if args.colocate_actor_vllm else None,
         )
 
     ray.get(refs)
@@ -223,6 +243,13 @@ if __name__ == "__main__":
     parser.add_argument("--vllm_sync_backend", type=str, default="nccl", help="DeepSpeed -> vLLM weight sync backend")
     parser.add_argument("--enable_prefix_caching", action="store_true", default=False)
     parser.add_argument("--enforce_eager", action="store_true", default=False, help="Disable CUDA graph in vLLM")
+    parser.add_argument("--mem_fraction_static", type=float, default=None, help="Memory usage fraction in SGLang")
+    parser.add_argument(
+        "--colocate_actor_vllm",
+        action="store_true",
+        default=False,
+        help="whether to colocate actor and vllm model, if true, they will share same gpus.",
+    )
 
     # Checkpoints
     parser.add_argument("--eval_steps", type=int, default=-1)

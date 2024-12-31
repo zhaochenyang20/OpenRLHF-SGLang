@@ -1,3 +1,4 @@
+import logging
 import os
 import os.path
 from abc import ABC
@@ -188,6 +189,7 @@ class PPOTrainer(ABC):
         consumed_samples=0,
         num_update_steps_per_episodes=1,
     ) -> None:
+        logging.warning("hi PPOTrainer.fit start")
         num_rollouts_per_episodes = (
             num_update_steps_per_episodes
             * args.train_batch_size
@@ -211,6 +213,7 @@ class PPOTrainer(ABC):
         consumed_samples = consumed_samples % (num_rollouts_per_episodes * args.rollout_batch_size)
 
         for episode in range(start_episode, args.num_episodes):
+            logging.warning(f"hi PPOTrainer.fit loop (iterate episode) {episode=}")
             if isinstance(self.prompts_dataloader.sampler, DistributedSampler):
                 self.prompts_dataloader.sampler.set_epoch(
                     episode, consumed_samples=0 if episode > start_episode else consumed_samples
@@ -222,9 +225,11 @@ class PPOTrainer(ABC):
             )
 
             for rand_prompts in self.prompts_dataloader:
+                logging.warning(f"hi PPOTrainer.fit loop (iterate prompts) {len(rand_prompts)=}")
                 for i, experience in enumerate(
                     self.experience_maker.make_experience_list(rand_prompts, **self.generate_kwargs)
                 ):
+                    logging.warning(f"hi PPOTrainer.fit loop (iterate experience) {i=}")
                     if i == 0:
                         output = self.tokenizer.batch_decode(
                             experience.sequences[0].unsqueeze(0), skip_special_tokens=True
@@ -255,6 +260,7 @@ class PPOTrainer(ABC):
             self._tensorboard.close()
 
     def ppo_train(self, global_steps=0):
+        logging.warning(f"hi PPOTrainer.ppo_train start {global_steps=}")
         # replay buffer may be empty at first, we should rebuild at each training
         dataloader = DataLoader(
             self.replay_buffer,
@@ -269,12 +275,14 @@ class PPOTrainer(ABC):
         status_list = []
         status_mean = {}
         for epoch in range(self.max_epochs):
+            logging.warning(f"hi PPOTrainer.ppo_train loop (iterate epoch) {epoch=}")
             pbar = tqdm(
                 dataloader,
                 desc=f"Train epoch [{epoch + 1}/{self.max_epochs}]",
                 disable=not self.strategy.is_rank_0(),
             )
             for experience in pbar:
+                logging.warning(f"hi PPOTrainer.ppo_train loop (iterate experience)")
                 experience.to_device(device)
                 status = self.training_step(experience, global_steps)
 
@@ -327,6 +335,7 @@ class PPOTrainer(ABC):
         return status
 
     def training_step_actor(self, experience: Experience) -> Dict[str, float]:
+        logging.warning(f"hi PPOTrainer.training_step_actor start")
         self.actor.train()
 
         # TODO: this is a bad indicator to say that data is packed...
@@ -413,6 +422,7 @@ class PPOTrainer(ABC):
         return status
 
     def training_step_critic(self, experience: Experience) -> Dict[str, float]:
+        logging.warning(f"hi PPOTrainer.training_step_critic start")
         self.critic.train()
 
         # TODO: this is a bad indicator to say that data is packed...
